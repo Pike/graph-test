@@ -1,0 +1,77 @@
+<html>
+  <head>
+    <title>Fork Graph</title>
+    <script type="text/javascript" src="protovis-d3.2.js"></script>
+    <style type="text/css">
+    </style>
+  </head>
+  <body>
+<div>An overview of the forks for this repository.</div>
+<div id="center"><div id="fig">
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.js"></script>
+    <script type="text/javascript">
+jQuery.noConflict();
+var prevNode, vis = new pv.Panel()
+    .width(document.body.clientWidth)
+    .height(600)
+    .left(75)
+    .right(-75)
+    .top(-30)
+    .bottom(-80)
+    .canvas("fig")
+    .font("16px sans-serif") 
+    .events("all")
+    .event("mousemove", pv.Behavior.point());
+jQuery.getJSON("http://localhost:8000/source/api/forks/"+document.location.search.substr(1),
+    show);
+var repos = [];
+function createNodes(d) {
+    var nd = new pv.Dom.Node('children' in d?'':" "+d.repo);
+    nd.repo = d.repo;
+    if (repos.indexOf(d.repo) == -1) repos.push(d.repo);
+    nd.revision = d.revision;
+    if ('children' in d) {
+      pv.map(d.children, function(_d) {
+        nd.appendChild(createNodes(_d))
+      });
+    }
+    return nd;
+}
+function show(d, res) {
+    try {
+    var nodes = createNodes(d);
+    } catch (e) {console.log(e)}
+    var tree = vis.add(pv.Layout.Tree)
+    .nodes(nodes.nodes())
+    .depth(100)
+    .breadth(60)
+    .orient("left");
+
+tree.link.add(pv.Line);
+var colorbar = pv.Colors.category20(repos);
+tree.node.add(pv.Dot)
+    .fillStyle(function(n) colorbar(n.repo))
+    .radius(7)
+    .cursor("pointer")
+    .event("point", function(nd){
+      if (prevNode) {prevNode.active=false;};
+      prevNode=nd;
+      nd.active=true;
+      jQuery("#out_ref").text(nd.revision.substr(0,12));
+      this.render();
+    })
+    .event("click", function(n){window.open('graph.html?revision='+n.revision)});
+
+var labels = tree.label.add(pv.Label).textAngle(Math.PI/8);
+labels.font("16px sans-serif");
+vis.render();
+}
+   </script>
+  </div></div>
+  <div id="details">
+    <table>
+      <tr><td>Revision:</td><td id="out_ref"></td></tr>
+    </table>
+  </div>
+  </body>
+</html>

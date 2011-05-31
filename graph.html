@@ -1,0 +1,113 @@
+<html>
+  <head>
+    <title>Changeset graph</title>
+    <script type="text/javascript" src="protovis-d3.2.js"></script>
+    <style type="text/css">
+
+td {
+  vertical-align: top;
+}
+
+    </style>
+  </head>
+  <body>
+<div>An overview of the changesets around the changesets, across repositories.</div>
+<div id="center"><div id="fig">
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.6.1.js"></script>
+    <script type="text/javascript" src="mercurial.js"></script>
+    <script type="text/javascript">
+    jQuery.noConflict();
+
+var tree, vis = new pv.Panel()
+    .width(document.body.clientWidth)
+    .height(200)
+    .canvas("fig")
+    .font("12px")
+    .events("all")
+    .event("mousemove", pv.Behavior.point());
+    var parms = {};
+    pv.map(document.location.search.substr(1).split('&'),
+      function(s) {
+        var t = s.split("=");
+        parms[decodeURIComponent(t[0])] = decodeURIComponent(t[1]);
+      }
+    );
+    var focusedRev = parms.revision.substr(0,12), prevNode;
+jQuery.ajax({
+  url: 'http://localhost:8000/source/api/network' + document.location.search,
+  dataType: 'json',
+  success: show
+});
+var lines;
+function show(d, res) {
+    tree = vis.add(pv.Layout.HgGraph);
+    tree.nodes_from_hg(d);
+var colorbar = pv.Colors.category10;
+lines = tree.link.add(pv.Line);
+
+tree.node.add(pv.Dot)
+    .radius(7)
+    .fillStyle(function(n) {
+      var c = colorbar(tree.repositories())(n.repo);
+      if (n.branch != 'default') {
+        return c.alpha(.5);
+      }
+      return c;
+    })
+    .event("point", function(nd){
+      if (prevNode) {prevNode.active=false;};
+      prevNode=nd;
+      nd.active=true;
+      this.parent.focus(nd.index);
+      showDetail(nd);
+      this.render();
+    })
+    .event("unpoint", function(nd){
+    })
+    .shape(function(nd){return nd.nodeValue==focusedRev?"triangle":nd.active?"diamond":"circle";})
+    .event("click", function(n){window.document.location='graph.html?revision='+n.nodeValue})
+    .cursor("pointer");
+  try {
+    vis.render();
+  } catch (e){console.log(e);}
+  try{
+  showDetail(tree.search_revision(focusedRev)[0]);
+  legend_table = jQuery("#legend > table");
+  var repos = tree.repositories(), clrs = colorbar(repos);
+  for (var i=0,ii=repos.length; i<ii; ++i) {
+   legend_table.append("<tr><td style='background-color:" +
+    clrs(repos[i]).color +
+    "'>&nbsp;&nbsp;&nbsp;</td><td>"+
+      repos[i]+"</td></tr>");
+      };
+  } catch(e){console.log(e)}
+}
+function showDetail(nd){
+  jQuery("#out_ref").text(nd.nodeValue);
+  jQuery("#out_desc").text(nd.description);
+  jQuery("#out_user").text(nd.user);
+  jQuery("#out_branch").text(nd.branch);
+}
+   </script>
+  </div></div>
+  <div id="legend">
+    <table></table>
+  </div>
+  <div id="details">
+    <table>
+      <tr><td>Revision:</td><td id="out_ref"></td></tr>
+      <tr><td>User:</td><td id="out_user"></td></tr>
+      <tr><td>Branch:</td><td id="out_branch"></td></tr>
+      <tr><td>Descriptions:</td><td id="out_desc" style="white-space:wrap"></td></tr>
+    </table>
+  </div>
+  <div>Just show the
+    <script type="application/javascript">
+    var _p = pv.extend(parms); _p.branch="default";
+    var _s = jQuery.param(_p);
+    var _r = "<a href='?" + _s + "'>default branch</a>.";
+    document.write(_r);
+    </script>
+    </div>
+  </body>
+</html>
